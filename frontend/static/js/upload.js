@@ -83,16 +83,20 @@ function showColumns(){
 
 function selectColumn(column){
 
-    document.getElementById("selectedColumn").textContent =
-        column;
+    document.getElementById("selectedColumn").textContent = column;
 
-    const values = csvData.map(row=>row[column]);
+    const values = csvData
+        .map(row => row[column])
+        .filter(value => value !== "");
+
+    const uniqueValues = [...new Set(values)];
 
     document.getElementById("json").textContent =
         JSON.stringify(
             {
-                column:column,
-                values:values
+                column: column,
+                totalUniqueValues: uniqueValues.length,
+                values: uniqueValues
             },
             null,
             2
