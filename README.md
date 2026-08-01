@@ -1,5 +1,12 @@
 # MoSPI
 
+### Frontend
+```
+cd frontend
+hugo server
+```
+
+### Backend
 ```
 cd backend
 python -m venv .venv
