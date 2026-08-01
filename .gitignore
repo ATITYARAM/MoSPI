@@ -1,13 +1,16 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
+public/
+resources/
 
-# VS Code
+.hugo_build.lock
+
+node_modules/
+
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+
 .vscode/
+.idea/
 
-# macOS
 .DS_Store
-
-# Windows
 Thumbs.db
