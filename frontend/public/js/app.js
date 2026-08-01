@@ -2,29 +2,51 @@ document
 .getElementById("load")
 .addEventListener("click", async () => {
 
-    const response = await fetch(
-        "http://127.0.0.1:8000/api/datasets?page=1"
-    );
+    const status = document.getElementById("datasetStatus");
 
-    const data = await response.json();
+    status.textContent = "Loading datasets...";
 
-    const container = document.getElementById("datasets");
+    try{
 
-    container.innerHTML = "";
+        const response = await fetch(
+            "http://127.0.0.1:8000/api/datasets?page=1"
+        );
 
-    data.result.rows.forEach(dataset => {
+        const data = await response.json();
 
-        const div = document.createElement("div");
+        const container = document.getElementById("datasets");
 
-        div.innerHTML = `
-            <h3>${dataset.title}</h3>
-            <p>ID : ${dataset.id}</p>
-            <p>Repository : ${dataset.repositoryid}</p>
-            <hr>
-        `;
+        container.innerHTML = "";
 
-        container.appendChild(div);
+        data.result.rows.forEach(dataset => {
 
-    });
+            const div = document.createElement("div");
+
+            div.className = "dataset";
+
+            div.innerHTML = `
+                <h3>${dataset.title}</h3>
+
+                <p><strong>ID:</strong> ${dataset.id}</p>
+
+                <p><strong>Repository:</strong> ${dataset.repositoryid}</p>
+            `;
+
+            container.appendChild(div);
+
+        });
+
+        status.textContent =
+            "✔ " + data.result.rows.length + " datasets loaded.";
+
+    }
+
+    catch(error){
+
+        status.textContent = "✖ Failed to load datasets.";
+
+        console.error(error);
+
+    }
 
 });
