@@ -1,0 +1,1901 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="MoSPI Dataset Explorer">
+
+  <aside>
+    <section>
+      <h2 class="section-title">Dataset Source</h2>
+
+      <div id="dropzone" class="dropzone">
+        <input
+          type="file"
+          id="fileInput"
+          accept=".csv,.xlsx,.xls"
+          hidden
+        />
+
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.5"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+          />
+        </svg>
+
+        <p class="drop-title">Drop CSV or Excel file</p>
+        <p class="drop-subtitle">or click to browse local storage</p>
+      </div>
+
+      <div id="uploadProgress" class="upload-progress hidden">
+
+        <div class="upload-progress-header">
+          <span id="uploadStatus">Reading file...</span>
+          <span id="uploadPercent">0%</span>
+        </div>
+
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+
+      </div>
+
+      <div class="samples">
+        <span>Quick Samples</span>
+
+        <div class="sample-buttons">
+          <button id="loadTestCsv" class="btn">test.csv</button>
+          <button id="loadStatesXlsx" class="btn">States.xlsx</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="sidebar-divider"></div>
+
+    <section id="datasetInfo" class="dataset-info hidden">
+      <h2 class="section-title">Dataset</h2>
+
+      <div class="info-card">
+        <div>
+          <span class="info-label">File</span>
+          <span id="datasetName" class="info-value">—</span>
+        </div>
+
+        <div>
+          <span class="info-label">Records</span>
+          <span id="datasetRows" class="info-value">0</span>
+        </div>
+
+        <div>
+          <span class="info-label">Variables</span>
+          <span id="datasetColumns" class="info-value">0</span>
+        </div>
+      </div>
+    </section>
+  </aside>
+
+
+  <section class="content-area">
+
+    <div class="toolbar">
+      <div>
+        <h2 class="view-title">Dataset View</h2>
+        <p id="viewStatus" class="view-status">
+          Load a dataset to begin
+        </p>
+      </div>
+
+      <div id="recordStats" class="record-stats">
+        0 records
+      </div>
+    </div>
+
+
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">M</div>
+
+      <h2>No dataset loaded</h2>
+
+      <p>
+        Upload a CSV or Excel file, or select one of the sample datasets.
+      </p>
+    </div>
+
+
+    <div id="tableContainer" class="table-container hidden">
+
+      <div class="table-wrapper">
+        <table id="dataTable">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button id="previousPage" class="btn" disabled>
+          Previous
+        </button>
+
+        <span id="pageInfo">
+          Page 1
+        </span>
+
+        <button id="nextPage" class="btn" disabled>
+          Next
+        </button>
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <script>
+    import Papa from 'papaparse';
+    import * as XLSX from 'xlsx';
+
+    let rawData = [];
+    let columns = [];
+    let currentPage = 1;
+
+    const ROWS_PER_PAGE = 50;
+
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+
+    const emptyState = document.getElementById('emptyState');
+    const tableContainer = document.getElementById('tableContainer');
+
+    const datasetInfo = document.getElementById('datasetInfo');
+    const datasetName = document.getElementById('datasetName');
+    const datasetRows = document.getElementById('datasetRows');
+    const datasetColumns = document.getElementById('datasetColumns');
+
+    const recordStats = document.getElementById('recordStats');
+    const viewStatus = document.getElementById('viewStatus');
+
+    const tableHead = document.getElementById('tableHead');
+    const tableBody = document.getElementById('tableBody');
+
+    const previousPage = document.getElementById('previousPage');
+    const nextPage = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
+
+    const uploadProgress =
+      document.getElementById('uploadProgress');
+
+    const uploadStatus =
+      document.getElementById('uploadStatus');
+
+    const uploadPercent =
+      document.getElementById('uploadPercent');
+
+    const progressBar =
+      document.getElementById('progressBar');
+
+
+    function showProgress(status = 'Reading file...', percent = 0) {
+
+      uploadProgress.classList.remove('hidden');
+
+      uploadStatus.textContent = status;
+
+      const value = Math.max(
+        0,
+        Math.min(100, percent)
+      );
+
+      uploadPercent.textContent = `${value}%`;
+
+      progressBar.style.width = `${value}%`;
+    }
+
+
+    function hideProgress() {
+
+      setTimeout(() => {
+        uploadProgress.classList.add('hidden');
+      }, 500);
+    }
+    /*
+     * FILE INPUT
+     */
+
+    dropzone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+
+      if (file) {
+        handleFile(file);
+      }
+    });
+
+
+    /*
+     * DRAG & DROP
+     */
+
+    dropzone.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropzone.classList.add('dragging');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragging');
+    });
+
+    dropzone.addEventListener('drop', (event) => {
+      event.preventDefault();
+
+      dropzone.classList.remove('dragging');
+
+      const file = event.dataTransfer?.files?.[0];
+
+      if (file) {
+        handleFile(file);
+      }
+    });
+
+
+    /*
+     * SAMPLE DATASETS
+     */
+
+    document
+      .getElementById('loadTestCsv')
+      .addEventListener('click', async () => {
+
+        try {
+          const response = await fetch(
+            `${import.meta.env.BASE_URL}sample_data/test.csv`
+          );
+
+          if (!response.ok) {
+            throw new Error('Unable to load test.csv');
+          }
+
+          const text = await response.text();
+
+          parseCSV(text, 'test.csv');
+
+        } catch (error) {
+          showError(error);
+        }
+      });
+
+
+    document
+      .getElementById('loadStatesXlsx')
+      .addEventListener('click', async () => {
+
+        try {
+          const response = await fetch(
+            `${import.meta.env.BASE_URL}sample_data/4_Indian_States_and_UTs_Code_and_Name.xlsx`
+          );
+
+          if (!response.ok) {
+            throw new Error('Unable to load States.xlsx');
+          }
+
+          const buffer = await response.arrayBuffer();
+
+          parseExcel(
+            buffer,
+            '4_Indian_States_and_UTs_Code_and_Name.xlsx'
+          );
+
+        } catch (error) {
+          showError(error);
+        }
+      });
+
+
+    /*
+     * FILE READER
+     */
+
+    function handleFile(file) {
+
+      const name = file.name.toLowerCase();
+
+      if (
+        !name.endsWith('.csv') &&
+        !name.endsWith('.xlsx') &&
+        !name.endsWith('.xls')
+      ) {
+        showError(
+          new Error('Please select a CSV or Excel file.')
+        );
+        return;
+      }
+
+      showProgress('Preparing file...', 0);
+
+      /*
+      * CSV
+      *
+      * Let Papa Parse read the File directly.
+      * This gives us real parsing progress through meta.cursor.
+      */
+      if (name.endsWith('.csv')) {
+
+        parseCSVFile(file);
+
+        return;
+      }
+
+      /*
+      * Excel
+      *
+      * XLSX needs the complete ArrayBuffer,
+      * so FileReader progress is used here.
+      */
+      const reader = new FileReader();
+
+      reader.onprogress = (event) => {
+
+        if (!event.lengthComputable) {
+          showProgress('Reading Excel file...', 0);
+          return;
+        }
+
+        const percent =
+          Math.round(
+            (event.loaded / event.total) * 100
+          );
+
+        showProgress(
+          'Reading Excel file...',
+          percent
+        );
+      };
+
+      reader.onerror = () => {
+
+        showError(
+          new Error('Unable to read the selected file.')
+        );
+
+      };
+
+      reader.onload = (event) => {
+
+        parseExcel(
+          event.target.result,
+          file.name
+        );
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function parseCSVFile(file) {
+
+      const data = [];
+
+      showProgress(
+        'Reading CSV...',
+        0
+      );
+
+      Papa.parse(file, {
+
+        header: true,
+
+        dynamicTyping: true,
+
+        skipEmptyLines: true,
+
+        chunkSize: 1024 * 1024,
+
+        chunk: (results, parser) => {
+
+          /*
+          * Add this chunk's rows.
+          */
+          results.data.forEach(row => {
+
+            if (
+              row &&
+              Object.keys(row).some(
+                key =>
+                  key.trim() !== '' &&
+                  row[key] !== null &&
+                  row[key] !== undefined &&
+                  String(row[key]).trim() !== ''
+              )
+            ) {
+              data.push(row);
+            }
+
+          });
+
+
+          /*
+          * Papa Parse gives us the number of
+          * bytes already processed.
+          */
+          const cursor =
+            results.meta?.cursor || 0;
+
+          const percent =
+            file.size > 0
+              ? Math.min(
+                  99,
+                  Math.round(
+                    (cursor / file.size) * 100
+                  )
+                )
+              : 0;
+
+
+          showProgress(
+            `Reading CSV... ${data.length.toLocaleString()} rows`,
+            percent
+          );
+
+        },
+
+
+        complete: () => {
+
+          showProgress(
+            'Detecting columns...',
+            100
+          );
+
+
+          if (!data.length) {
+
+            showError(
+              new Error(
+                'No tabular data could be detected in the CSV file.'
+              )
+            );
+
+            return;
+          }
+
+
+          /*
+          * Dataset is now completely parsed.
+          */
+          loadDataset(
+            data,
+            file.name
+          );
+
+          hideProgress();
+
+        },
+
+
+        error: (error) => {
+
+          showError(error);
+
+        }
+
+      });
+    }
+
+
+    /*
+     * CSV
+     */
+
+    function parseCSV(text, name) {
+
+      showProgress(
+        'Detecting columns...',
+        100
+      );
+
+      Papa.parse(text, {
+
+        header: true,
+
+        dynamicTyping: true,
+
+        skipEmptyLines: true,
+
+        complete: (results) => {
+
+          if (results.errors?.length) {
+
+            console.warn(
+              'CSV parsing warnings:',
+              results.errors
+            );
+          }
+
+          const data =
+            results.data.filter(
+              row =>
+                row &&
+                Object.keys(row).some(
+                  key =>
+                    key.trim() !== '' &&
+                    row[key] !== null &&
+                    row[key] !== undefined &&
+                    String(row[key]).trim() !== ''
+                )
+            );
+
+          if (!data.length) {
+
+            showError(
+              new Error(
+                'No tabular data could be detected in the CSV file.'
+              )
+            );
+
+            return;
+          }
+
+          loadDataset(
+            data,
+            name
+          );
+        },
+
+        error: (error) => {
+
+          showError(error);
+
+        }
+
+      });
+    }
+
+
+    /*
+     * EXCEL
+     */
+
+    function parseExcel(buffer, name) {
+
+      try {
+
+        showProgress(
+          'Reading worksheet...',
+          100
+        );
+
+        const workbook =
+          XLSX.read(buffer, {
+            type: 'array'
+          });
+
+
+        if (!workbook.SheetNames.length) {
+
+          throw new Error(
+            'The Excel file contains no worksheets.'
+          );
+        }
+
+
+        /*
+        * Check every worksheet.
+        * We do not depend on an Excel "Table".
+        */
+        let bestSheet = null;
+        let bestMatrix = null;
+        let bestScore = 0;
+
+
+        workbook.SheetNames.forEach(sheetName => {
+
+          const sheet =
+            workbook.Sheets[sheetName];
+
+          const matrix =
+            XLSX.utils.sheet_to_json(
+              sheet,
+              {
+                header: 1,
+                defval: '',
+                raw: true
+              }
+            );
+
+
+          const score =
+            scoreWorksheet(matrix);
+
+
+          if (score > bestScore) {
+
+            bestScore = score;
+            bestSheet = sheetName;
+            bestMatrix = matrix;
+
+          }
+
+        });
+
+
+        if (!bestMatrix || !bestMatrix.length) {
+
+          throw new Error(
+            'No tabular data could be detected in the Excel file.'
+          );
+        }
+
+
+        showProgress(
+          'Detecting columns...',
+          100
+        );
+
+
+        const data =
+          matrixToObjects(bestMatrix);
+
+
+        if (!data.length) {
+
+          throw new Error(
+            'The worksheet contains no usable tabular data.'
+          );
+        }
+
+
+        loadDataset(
+          data,
+          name
+        );
+
+
+      } catch (error) {
+
+        showError(error);
+
+      }
+    }
+
+
+    /*
+     * DATASET LOADING
+     *
+     * Nothing here knows the dataset's column names.
+     */
+
+    function loadDataset(data, name) {
+
+      if (!Array.isArray(data) || data.length === 0) {
+
+        showError(
+          new Error('The dataset contains no records.')
+        );
+
+        return;
+      }
+
+      rawData = data;
+
+      /*
+       * Automatically obtain column headings.
+       */
+      columns = getColumns(rawData);
+
+      currentPage = 1;
+
+      showDataset(name);
+
+      renderTable();
+
+    }
+
+
+    /*
+     * COLUMN DETECTION
+     */
+
+    function getColumns(data) {
+
+      const columnSet = new Set();
+
+      data.forEach(row => {
+
+        Object.keys(row).forEach(column => {
+          columnSet.add(column);
+        });
+
+      });
+
+      return [...columnSet];
+    }
+
+
+    /*
+     * DISPLAY DATASET INFORMATION
+     */
+
+    function showDataset(name) {
+
+      emptyState.classList.add('hidden');
+      tableContainer.classList.remove('hidden');
+
+      datasetInfo.classList.remove('hidden');
+
+      datasetName.textContent = name;
+
+      datasetRows.textContent =
+        rawData.length.toLocaleString();
+
+      datasetColumns.textContent =
+        columns.length.toLocaleString();
+
+      recordStats.textContent =
+        `${rawData.length.toLocaleString()} records`;
+
+      viewStatus.textContent =
+        `${columns.length} variables detected automatically`;
+    }
+
+
+    /*
+     * TABLE
+     */
+
+    function renderTable() {
+
+      tableHead.innerHTML = '';
+      tableBody.innerHTML = '';
+
+      /*
+       * HEADER
+       *
+       * Generated directly from the dataset.
+       */
+
+      const headerRow =
+        document.createElement('tr');
+
+      columns.forEach(column => {
+
+        const th =
+          document.createElement('th');
+
+        th.textContent = column;
+
+        headerRow.appendChild(th);
+
+      });
+
+      tableHead.appendChild(headerRow);
+
+
+      /*
+       * PAGINATION
+       */
+
+      const start =
+        (currentPage - 1) * ROWS_PER_PAGE;
+
+      const end =
+        start + ROWS_PER_PAGE;
+
+      const pageRows =
+        rawData.slice(start, end);
+
+
+      /*
+       * ROWS
+       */
+
+      pageRows.forEach(row => {
+
+        const tr =
+          document.createElement('tr');
+
+        columns.forEach(column => {
+
+          const td =
+            document.createElement('td');
+
+          const value =
+            row[column];
+
+          td.textContent =
+            value === null ||
+            value === undefined
+              ? ''
+              : String(value);
+
+          tr.appendChild(td);
+
+        });
+
+        tableBody.appendChild(tr);
+
+      });
+
+
+      updatePagination();
+    }
+
+
+    /*
+     * PAGINATION
+     */
+
+    function updatePagination() {
+
+      const totalPages =
+        Math.max(
+          1,
+          Math.ceil(
+            rawData.length / ROWS_PER_PAGE
+          )
+        );
+
+      pageInfo.textContent =
+        `Page ${currentPage} of ${totalPages}`;
+
+      previousPage.disabled =
+        currentPage <= 1;
+
+      nextPage.disabled =
+        currentPage >= totalPages;
+    }
+
+
+    previousPage.addEventListener('click', () => {
+
+      if (currentPage <= 1) return;
+
+      currentPage--;
+
+      renderTable();
+    });
+
+
+    nextPage.addEventListener('click', () => {
+
+      const totalPages =
+        Math.ceil(
+          rawData.length / ROWS_PER_PAGE
+        );
+
+      if (currentPage >= totalPages) return;
+
+      currentPage++;
+
+      renderTable();
+    });
+
+
+    /*
+     * ERROR
+     */
+
+    function showError(error) {
+
+      console.error(error);
+
+      emptyState.classList.remove('hidden');
+      tableContainer.classList.add('hidden');
+
+      datasetInfo.classList.add('hidden');
+
+      viewStatus.textContent = 'Unable to load dataset';
+
+      emptyState.innerHTML = `
+        <div class="empty-icon error-icon">!</div>
+        <h2>Unable to load dataset</h2>
+        <p>${escapeHTML(error?.message || 'Unknown error')}</p>
+      `;
+    }
+
+
+    /*
+     * Basic HTML escaping for error messages.
+     */
+
+    function escapeHTML(value) {
+
+      const div =
+        document.createElement('div');
+
+      div.textContent = value;
+
+      return div.innerHTML;
+    }
+
+    function scoreWorksheet(matrix) {
+
+      if (!Array.isArray(matrix) || !matrix.length) {
+        return 0;
+      }
+
+      let bestScore = 0;
+
+      const rowsToCheck =
+        Math.min(matrix.length, 30);
+
+
+      for (let i = 0; i < rowsToCheck; i++) {
+
+        const row =
+          Array.isArray(matrix[i])
+            ? matrix[i]
+            : [];
+
+
+        const values =
+          row.filter(
+            value =>
+              value !== null &&
+              value !== undefined &&
+              String(value).trim() !== ''
+          );
+
+
+        if (!values.length) {
+          continue;
+        }
+
+
+        const nonEmpty =
+          values.length;
+
+
+        const unique =
+          new Set(
+            values.map(value =>
+              String(value).trim()
+            )
+          ).size;
+
+
+        /*
+        * A useful header row usually has:
+        *
+        * - several non-empty cells
+        * - mostly unique values
+        * - text-like labels
+        */
+
+        let textCount = 0;
+
+        values.forEach(value => {
+
+          if (
+            typeof value === 'string' &&
+            value.trim() !== ''
+          ) {
+            textCount++;
+          }
+
+        });
+
+
+        const uniqueness =
+          unique / nonEmpty;
+
+
+        const score =
+          nonEmpty * 10 +
+          uniqueness * 20 +
+          textCount * 5;
+
+
+        bestScore =
+          Math.max(
+            bestScore,
+            score
+          );
+      }
+
+      return bestScore;
+    }
+
+    function matrixToObjects(matrix) {
+
+      if (!Array.isArray(matrix) || !matrix.length) {
+        return [];
+      }
+
+
+      /*
+      * Find the most likely header row.
+      */
+
+      let headerIndex = 0;
+      let bestScore = -Infinity;
+
+
+      const rowsToCheck =
+        Math.min(matrix.length, 30);
+
+
+      for (let i = 0; i < rowsToCheck; i++) {
+
+        const row =
+          Array.isArray(matrix[i])
+            ? matrix[i]
+            : [];
+
+
+        const values =
+          row.filter(
+            value =>
+              value !== null &&
+              value !== undefined &&
+              String(value).trim() !== ''
+          );
+
+
+        if (!values.length) {
+          continue;
+        }
+
+
+        const unique =
+          new Set(
+            values.map(value =>
+              String(value).trim()
+            )
+          ).size;
+
+
+        const textCount =
+          values.filter(
+            value =>
+              typeof value === 'string'
+          ).length;
+
+
+        const score =
+          values.length * 10 +
+          unique * 5 +
+          textCount * 3;
+
+
+        if (score > bestScore) {
+
+          bestScore = score;
+          headerIndex = i;
+
+        }
+      }
+
+
+      const rawHeaders =
+        matrix[headerIndex] || [];
+
+
+      /*
+      * Generate clean unique column names.
+      */
+
+      const headers = [];
+      const used = new Map();
+
+
+      rawHeaders.forEach((value, index) => {
+
+        let header =
+          String(
+            value ?? ''
+          ).trim();
+
+
+        if (!header) {
+
+          header =
+            `Column ${index + 1}`;
+
+        }
+
+
+        const count =
+          used.get(header) || 0;
+
+
+        used.set(
+          header,
+          count + 1
+        );
+
+
+        if (count > 0) {
+
+          header =
+            `${header} (${count + 1})`;
+
+        }
+
+
+        headers.push(header);
+
+      });
+
+
+      /*
+      * Remove completely empty columns.
+      */
+
+      const activeIndexes =
+        headers
+          .map((header, index) => {
+
+            const hasData =
+              matrix
+                .slice(headerIndex + 1)
+                .some(row =>
+                  row &&
+                  row[index] !== null &&
+                  row[index] !== undefined &&
+                  String(row[index]).trim() !== ''
+                );
+
+            return hasData
+              ? index
+              : -1;
+
+          })
+          .filter(index => index !== -1);
+
+
+      /*
+      * Convert rows into objects.
+      */
+
+      const data = [];
+
+
+      for (
+        let rowIndex = headerIndex + 1;
+        rowIndex < matrix.length;
+        rowIndex++
+      ) {
+
+        const row =
+          matrix[rowIndex];
+
+        if (!Array.isArray(row)) {
+          continue;
+        }
+
+
+        const object = {};
+
+        let hasValue = false;
+
+
+        activeIndexes.forEach(index => {
+
+          const value =
+            row[index] ?? '';
+
+
+          if (
+            value !== '' &&
+            value !== null &&
+            value !== undefined
+          ) {
+            hasValue = true;
+          }
+
+
+          object[headers[index]] =
+            value;
+
+        });
+
+
+        if (hasValue) {
+          data.push(object);
+        }
+
+      }
+
+
+      return data;
+    }
+
+  </script>
+
+
+  <style>
+
+    :global(*) {
+      box-sizing: border-box;
+    }
+
+    :global(html),
+    :global(body) {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    :global(body) {
+      background: #080b12;
+      color: #e5e7eb;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        sans-serif;
+    }
+
+
+    /* =========================================================
+      MAIN APPLICATION
+      ========================================================= */
+
+    :global(main) {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+    }
+
+
+    /* =========================================================
+      LEFT SIDEBAR
+      ========================================================= */
+
+    aside {
+      width: 280px;
+      min-width: 280px;
+      height: 100vh;
+
+      display: flex;
+      flex-direction: column;
+
+      background: #0b1019;
+      border-right: 1px solid #1c2533;
+
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    aside > section {
+      padding: 18px;
+    }
+
+
+    /* =========================================================
+      SECTION TITLE
+      ========================================================= */
+
+    .section-title {
+      margin: 0 0 10px;
+
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+
+      color: #7f8ba3;
+    }
+
+
+    /* =========================================================
+      DROPZONE
+      ========================================================= */
+
+    .dropzone {
+      width: 100%;
+      min-height: 190px;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      padding: 25px 18px;
+
+      border: 1px dashed #344154;
+      border-radius: 12px;
+
+      background:
+        linear-gradient(
+          180deg,
+          rgba(20, 29, 43, 0.9),
+          rgba(13, 19, 30, 0.9)
+        );
+
+      cursor: pointer;
+
+      transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .dropzone:hover,
+    .dropzone.dragging {
+      border-color: #6366f1;
+      background: #111827;
+    }
+
+    .dropzone.dragging {
+      transform: scale(1.01);
+    }
+
+    .dropzone svg {
+      width: 38px;
+      height: 38px;
+
+      margin-bottom: 14px;
+
+      color: #818cf8;
+    }
+
+    .drop-title {
+      margin: 0;
+
+      color: #e5e7eb;
+
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .drop-subtitle {
+      margin: 6px 0 0;
+
+      color: #64748b;
+
+      font-size: 11px;
+    }
+
+
+    /* =========================================================
+      UPLOAD PROGRESS
+      ========================================================= */
+
+    .upload-progress {
+      margin-top: 10px;
+
+      padding: 11px 12px;
+
+      border: 1px solid #202b3c;
+      border-radius: 8px;
+
+      background: #0d1420;
+    }
+
+    .upload-progress-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      margin-bottom: 8px;
+    }
+
+    #uploadStatus {
+      min-width: 0;
+
+      color: #94a3b8;
+
+      font-size: 10px;
+
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #uploadPercent {
+      flex-shrink: 0;
+
+      margin-left: 10px;
+
+      color: #c7d2fe;
+
+      font-size: 10px;
+      font-family: monospace;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 4px;
+
+      overflow: hidden;
+
+      border-radius: 999px;
+
+      background: #1e293b;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+
+      border-radius: inherit;
+
+      background: #6366f1;
+
+      transition: width 0.15s ease;
+    }
+
+
+    /* =========================================================
+      SAMPLE BUTTONS
+      ========================================================= */
+
+    .samples {
+      margin-top: 14px;
+    }
+
+    .samples > span {
+      display: block;
+
+      margin-bottom: 7px;
+
+      color: #64748b;
+
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .sample-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn {
+      border: 1px solid #293548;
+
+      border-radius: 6px;
+
+      padding: 7px 10px;
+
+      background: #111827;
+      color: #cbd5e1;
+
+      font-size: 11px;
+      font-weight: 600;
+
+      cursor: pointer;
+
+      transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: #4b5563;
+      background: #1a2332;
+      color: #f8fafc;
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+
+    /* =========================================================
+      SIDEBAR DIVIDER
+      ========================================================= */
+
+    .sidebar-divider {
+      width: calc(100% - 36px);
+      height: 1px;
+
+      margin: 0 18px;
+
+      background: #1c2533;
+    }
+
+
+    /* =========================================================
+      DATASET INFORMATION
+      ========================================================= */
+
+    .dataset-info {
+      padding-top: 16px;
+    }
+
+    .info-card {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+
+      padding: 12px;
+
+      border: 1px solid #202b3c;
+      border-radius: 9px;
+
+      background: #0d1420;
+    }
+
+    .info-card > div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      gap: 12px;
+    }
+
+    .info-label {
+      color: #64748b;
+      font-size: 10px;
+    }
+
+    .info-value {
+      min-width: 0;
+
+      color: #cbd5e1;
+
+      font-size: 10px;
+      font-family: monospace;
+
+      text-align: right;
+
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+
+    /* =========================================================
+      HIDDEN
+      ========================================================= */
+
+    .hidden {
+      display: none !important;
+    }
+
+
+    /* =========================================================
+      MAIN CONTENT
+      ========================================================= */
+
+    .content-area {
+      min-width: 0;
+      width: 100%;
+      height: 100vh;
+
+      display: flex;
+      flex-direction: column;
+
+      overflow: hidden;
+
+      background: #080b12;
+    }
+
+
+    /* =========================================================
+      TOOLBAR
+      ========================================================= */
+
+    .toolbar {
+      flex-shrink: 0;
+
+      min-height: 76px;
+
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      gap: 20px;
+
+      padding: 0 22px;
+
+      border-bottom: 1px solid #1c2533;
+
+      background: #0b1019;
+    }
+
+    .view-title {
+      margin: 0;
+
+      color: #f1f5f9;
+
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .view-status {
+      margin: 5px 0 0;
+
+      color: #64748b;
+
+      font-size: 11px;
+    }
+
+    .record-stats {
+      flex-shrink: 0;
+
+      padding: 7px 11px;
+
+      border: 1px solid #263246;
+      border-radius: 7px;
+
+      background: #101827;
+
+      color: #a5b4fc;
+
+      font-size: 10px;
+      font-family: monospace;
+    }
+
+
+    /* =========================================================
+      EMPTY STATE
+      ========================================================= */
+
+    .empty-state {
+      flex: 1;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      padding: 40px;
+
+      text-align: center;
+    }
+
+    .empty-icon {
+      width: 52px;
+      height: 52px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      margin-bottom: 16px;
+
+      border: 1px solid #293548;
+      border-radius: 12px;
+
+      background: #111827;
+
+      color: #818cf8;
+
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .error-icon {
+      color: #f87171;
+    }
+
+    .empty-state h2 {
+      margin: 0 0 7px;
+
+      color: #cbd5e1;
+
+      font-size: 15px;
+    }
+
+    .empty-state p {
+      max-width: 450px;
+
+      margin: 0;
+
+      color: #64748b;
+
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+
+    /* =========================================================
+      TABLE CONTAINER
+      ========================================================= */
+
+    .table-container {
+      flex: 1;
+      min-height: 0;
+
+      display: flex;
+      flex-direction: column;
+
+      padding: 16px 20px 18px;
+
+      gap: 12px;
+    }
+
+
+    /* =========================================================
+      TABLE
+      ========================================================= */
+
+    .table-wrapper {
+      flex: 1;
+      min-height: 0;
+
+      width: 100%;
+
+      overflow: auto;
+
+      border: 1px solid #202b3c;
+      border-radius: 10px;
+
+      background: #090e16;
+
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    table {
+      width: max-content;
+      min-width: 100%;
+
+      border-collapse: separate;
+      border-spacing: 0;
+
+      table-layout: auto;
+
+      text-align: left;
+
+      font-size: 12px;
+    }
+
+
+    /* =========================================================
+      TABLE CELLS
+      ========================================================= */
+
+    th,
+    td {
+      padding: 10px 14px;
+
+      border-right: 1px solid #1b2635;
+      border-bottom: 1px solid #1b2635;
+
+      white-space: nowrap;
+
+      min-width: 120px;
+
+      max-width: 360px;
+    }
+
+    th:last-child,
+    td:last-child {
+      border-right: none;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+
+    /* =========================================================
+      TABLE HEADER
+      ========================================================= */
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+
+      background: #111827;
+
+      color: #d1d5db;
+
+      font-size: 10px;
+      font-weight: 700;
+
+      letter-spacing: 0.03em;
+    }
+
+    th::after {
+      content: "";
+
+      position: absolute;
+
+      left: 0;
+      right: 0;
+      bottom: -1px;
+
+      height: 1px;
+
+      background: #293548;
+    }
+
+
+    /* =========================================================
+      TABLE BODY
+      ========================================================= */
+
+    td {
+      color: #94a3b8;
+
+      font-size: 11px;
+    }
+
+    tbody tr:hover td {
+      background: #101827;
+      color: #cbd5e1;
+    }
+
+
+    /* =========================================================
+      PAGINATION
+      ========================================================= */
+
+    .pagination {
+      flex-shrink: 0;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      gap: 12px;
+    }
+
+    #pageInfo {
+      min-width: 110px;
+
+      text-align: center;
+
+      color: #64748b;
+
+      font-size: 10px;
+      font-family: monospace;
+    }
+
+
+    /* =========================================================
+      RESPONSIVE
+      ========================================================= */
+
+    @media (max-width: 800px) {
+
+      aside {
+        width: 230px;
+        min-width: 230px;
+      }
+
+      aside > section {
+        padding: 14px;
+      }
+
+      .toolbar {
+        padding: 0 16px;
+      }
+
+      .table-container {
+        padding: 12px;
+      }
+
+    }
+
+    @media (max-width: 600px) {
+
+      :global(main) {
+        flex-direction: column;
+      }
+
+      aside {
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        max-height: 330px;
+
+        border-right: none;
+        border-bottom: 1px solid #1c2533;
+      }
+
+      .content-area {
+        height: calc(100vh - 330px);
+      }
+
+    }
+
+  </style>
+
+</Layout>

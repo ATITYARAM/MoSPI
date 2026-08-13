@@ -1,0 +1,217 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <!-- SheetJS, PapaParse & Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #07090e;
+        color: #f8fafc;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      header {
+        background: #0b0f17;
+        border-bottom: 1px solid #1e293b;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .logo-box {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .logo-icon {
+        width: 38px; height: 38px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: bold; font-size: 16px; color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      }
+      .main-layout {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        width: 100%;
+      }
+      aside {
+        width: 380px;
+        background: #0b0f17;
+        border-right: 1px solid #1e293b;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      .dropzone {
+        border: 2px dashed #334155;
+        background: #0f1523;
+        padding: 20px;
+        text-align: center;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .dropzone:hover { border-color: #6366f1; background: #131b2e; }
+      .dropzone svg {
+        width: 32px;
+        height: 32px;
+        stroke: #94a3b8;
+        margin-bottom: 8px;
+      }
+      .content-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #07090e;
+        overflow: hidden;
+      }
+      .toolbar {
+        background: #0b0f17;
+        border-bottom: 1px solid #1e293b;
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .tab-group {
+        display: flex;
+        gap: 6px;
+        background: #07090e;
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid #1e293b;
+      }
+      .tab-btn {
+        background: transparent;
+        color: #94a3b8;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .tab-btn:hover { color: white; background: #1e293b; }
+      .tab-btn.active {
+        background: #6366f1;
+        color: white;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+      }
+      .tab-pane {
+        flex: 1;
+        padding: 24px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .tab-pane.hidden { display: none; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 12px;
+      }
+      th, td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #1e293b;
+      }
+      th {
+        background: #0b0f17;
+        color: #cbd5e1;
+        position: sticky;
+        top: 0;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+      }
+      tr:hover td { background: rgba(30, 41, 59, 0.4); }
+      select, input[type="range"] {
+        width: 100%;
+        background: #07090e;
+        border: 1px solid #334155;
+        color: #f8fafc;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        outline: none;
+      }
+      select:focus { border-color: #6366f1; }
+      pre {
+        background: #0b0f17;
+        border: 1px solid #1e293b;
+        padding: 16px;
+        border-radius: 10px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #a5b4fc;
+        overflow: auto;
+        flex: 1;
+      }
+      .btn {
+        background: #1e293b;
+        color: #cbd5e1;
+        border: 1px solid #334155;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .btn:hover { background: #334155; color: white; }
+      .filter-card {
+        background: #0f1523;
+        border: 1px solid #1e293b;
+        padding: 12px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo-box">
+        <div class="logo-icon">M</div>
+        <div>
+          <h1 style="font-size: 14px; font-weight: 700; letter-spacing: -0.01em;">MoSPI Microdata Explorer</h1>
+          <p style="font-size: 11px; color: #94a3b8;">Schema-Agnostic Dynamic Tabulation & REST Gateway</p>
+        </div>
+      </div>
+      <div style="font-size: 11px; color: #34d399; background: rgba(52,211,153,0.1); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(52,211,153,0.2); display: flex; align-items: center; gap: 6px; font-weight: 500;">
+        <span style="width: 6px; height: 6px; background: #34d399; border-radius: 50%; display: inline-block;"></span> Engine Online
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <slot />
+    </main>
+  </body>
+</html>
