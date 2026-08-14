@@ -205,13 +205,136 @@ const base = import.meta.env.BASE_URL;
           <p style="font-size: 11px; color: #94a3b8;">Schema-Agnostic Dynamic Tabulation & REST Gateway</p>
         </div>
       </div>
-      <div style="font-size: 11px; color: #34d399; background: rgba(52,211,153,0.1); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(52,211,153,0.2); display: flex; align-items: center; gap: 6px; font-weight: 500;">
-        <span style="width: 6px; height: 6px; background: #34d399; border-radius: 50%; display: inline-block;"></span> Engine Online
+      <div style="display: flex; align-items: center; gap: 8px;">
+
+        <!-- Dataset Explorer Button -->
+        <a
+          href={`${base}datasets/`}
+          class="header-btn"
+          title="Open Dataset Explorer"
+        >
+          <span class="header-btn-icon">▦</span>
+          Dataset Explorer
+        </a>
+
+        <!-- Live Engine Status -->
+        <div id="engine-status" class="engine-status online">
+          <span id="engine-dot" class="engine-dot"></span>
+          <span id="engine-text">Engine Online</span>
+        </div>
+
       </div>
     </header>
 
     <main class="main-layout">
       <slot />
     </main>
+<script>
+  const status = document.getElementById("engine-status");
+  const dot = document.getElementById("engine-dot");
+  const text = document.getElementById("engine-text");
+
+  function updateEngineStatus(online: boolean) {
+    if (!status || !dot || !text) return;
+
+    if (online) {
+      status.classList.remove("offline");
+      status.classList.add("online");
+      text.textContent = "Engine Online";
+    } else {
+      status.classList.remove("online");
+      status.classList.add("offline");
+      text.textContent = "Engine Offline";
+    }
+  }
+
+  // Immediate browser network state
+  function checkConnection() {
+    updateEngineStatus(navigator.onLine);
+  }
+
+  window.addEventListener("online", checkConnection);
+  window.addEventListener("offline", checkConnection);
+
+  // Initial state
+  checkConnection();
+
+  // Recheck periodically
+  setInterval(checkConnection, 5000);
+</script>
+
+<style>
+/* Header Dataset Button */
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid #334155;
+  background: #0f1523;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.header-btn:hover {
+  background: #1e293b;
+  border-color: #6366f1;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.header-btn-icon {
+  font-size: 14px;
+  color: #a5b4fc;
+}
+
+/* Engine Status */
+.engine-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+/* Online */
+.engine-status.online {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+/* Offline */
+.engine-status.offline {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.engine-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  transition: all 0.25s ease;
+}
+
+.engine-status.online .engine-dot {
+  background: #34d399;
+  box-shadow: 0 0 7px rgba(52, 211, 153, 0.7);
+}
+
+.engine-status.offline .engine-dot {
+  background: #f87171;
+  box-shadow: 0 0 7px rgba(248, 113, 113, 0.7);
+}
+</style>
   </body>
 </html>
