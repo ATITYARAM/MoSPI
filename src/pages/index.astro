@@ -79,6 +79,32 @@ import Layout from '../layouts/Layout.astro';
 
   <section class="content-area">
 
+<div class="sql-tester">
+
+  <div class="sql-header">
+    <div>
+      <h2>SQL Query</h2>
+      <p>Run a SELECT query against the connected database.</p>
+    </div>
+
+    <button id="runSql" class="btn">
+      Run Query
+    </button>
+  </div>
+
+  <textarea
+    id="sqlInput"
+    spellcheck="false"
+  >SELECT * FROM states LIMIT 10</textarea>
+
+  <div id="sqlStatus" class="sql-status">
+    Ready
+  </div>
+
+  <pre id="jsonPreview" class="json-preview"></pre>
+
+</div>
+
     <div class="toolbar">
       <div>
         <h2 class="view-title">Dataset View</h2>
@@ -174,7 +200,135 @@ import Layout from '../layouts/Layout.astro';
 
     const progressBar =
       document.getElementById('progressBar');
+const SUPABASE_URL =
+  import.meta.env.PUBLIC_SUPABASE_URL;
 
+const SUPABASE_KEY =
+  import.meta.env.PUBLIC_SUPABASE_KEY;
+
+
+const sqlInput =
+  document.getElementById('sqlInput') as HTMLTextAreaElement;
+
+const runSql =
+  document.getElementById('runSql') as HTMLButtonElement;
+
+const sqlStatus =
+  document.getElementById('sqlStatus') as HTMLElement;
+
+const jsonPreview =
+  document.getElementById('jsonPreview') as HTMLElement;
+
+
+runSql.addEventListener('click', async () => {
+
+  const query =
+    sqlInput.value.trim();
+
+  if (!query) {
+
+    sqlStatus.textContent =
+      'Enter a SQL query.';
+
+    return;
+  }
+
+
+  runSql.disabled = true;
+
+  sqlStatus.textContent =
+    'Running query...';
+
+  jsonPreview.textContent =
+    'Loading...';
+
+
+  try {
+
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/run_select`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json',
+
+            'apikey':
+              SUPABASE_KEY
+          },
+
+          body: JSON.stringify({
+            query_text: query
+          })
+        }
+      );
+
+
+    const result =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        result?.message ||
+        result?.hint ||
+        result?.details ||
+        `Supabase request failed (${response.status})`
+      );
+    }
+
+
+    jsonPreview.textContent =
+      JSON.stringify(
+        {
+          success: true,
+          data: result
+        },
+        null,
+        2
+      );
+
+
+    sqlStatus.textContent =
+      `Query successful • ${
+        Array.isArray(result)
+          ? result.length
+          : 0
+      } rows`;
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    jsonPreview.textContent =
+      JSON.stringify(
+        {
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : String(error)
+        },
+        null,
+        2
+      );
+
+
+    sqlStatus.textContent =
+      'Query failed';
+
+
+  } finally {
+
+    runSql.disabled = false;
+
+  }
+
+});
 
     function showProgress(status = 'Reading file...', percent = 0) {
 
@@ -1895,6 +2049,85 @@ import Layout from '../layouts/Layout.astro';
       }
 
     }
+
+.sql-tester {
+  margin: 20px 24px;
+  padding: 16px;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  background: #0b0f17;
+}
+
+.sql-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.sql-header h2 {
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.sql-header p {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+#sqlInput {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+
+  padding: 12px;
+
+  border: 1px solid #334155;
+  border-radius: 8px;
+
+  background: #080c13;
+  color: #cbd5e1;
+
+  font-family: monospace;
+  font-size: 12px;
+
+  outline: none;
+}
+
+#sqlInput:focus {
+  border-color: #6366f1;
+}
+
+.sql-status {
+  margin-top: 8px;
+
+  font-size: 10px;
+  color: #64748b;
+}
+
+.json-preview {
+  margin-top: 12px;
+
+  max-height: 420px;
+  overflow: auto;
+
+  padding: 14px;
+
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+
+  background: #060a10;
+
+  color: #cbd5e1;
+
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.6;
+
+  white-space: pre-wrap;
+}
 
   </style>
 
