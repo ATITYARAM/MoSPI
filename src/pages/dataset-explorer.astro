@@ -124,6 +124,88 @@ const categories = [
     ========================== -->
 
     <section id="dataset-page" class="hidden">
+<!-- SQL PANEL -->
+
+<button
+  id="sql-toggle"
+  class="sql-toggle"
+  type="button"
+>
+  SQL
+</button>
+
+<aside
+  id="sql-panel"
+  class="sql-panel"
+>
+
+  <div class="sql-panel-header">
+
+    <div>
+      <span class="sql-label">
+        QUERY CONSOLE
+      </span>
+
+      <h2>
+        SQL Query
+      </h2>
+    </div>
+
+    <button
+      id="sql-close"
+      class="sql-close"
+      type="button"
+      aria-label="Close SQL panel"
+    >
+      ×
+    </button>
+
+  </div>
+
+
+  <div class="sql-panel-body">
+
+    <p class="sql-help">
+      Run a SELECT query against the
+      MoSPI dataset database.
+    </p>
+
+
+    <textarea
+      id="sql-query"
+      class="sql-query"
+      spellcheck="false"
+    >SELECT * FROM plfs LIMIT 20;</textarea>
+
+
+    <button
+      id="sql-run"
+      class="sql-run"
+      type="button"
+    >
+      Run Query
+    </button>
+
+
+    <div
+      id="sql-status"
+      class="sql-status"
+    ></div>
+
+
+    <pre
+      id="sql-output"
+      class="sql-output"
+    >Query result will appear here...</pre>
+
+  </div>
+
+</aside>
+
+<div
+  id="sql-overlay"
+  class="sql-overlay"
+></div>
 
       <header class="dataset-header">
 
@@ -183,6 +265,186 @@ const categories = [
 
 
   <script>
+
+import { createClient } from "@supabase/supabase-js";
+
+
+const SUPABASE_URL =
+  import.meta.env.PUBLIC_SUPABASE_URL;
+
+const SUPABASE_KEY =
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+
+const supabase =
+  createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  const sqlToggle =
+  document.querySelector("#sql-toggle");
+
+const sqlPanel =
+  document.querySelector("#sql-panel");
+
+const sqlClose =
+  document.querySelector("#sql-close");
+
+const sqlOverlay =
+  document.querySelector("#sql-overlay");
+
+const sqlRun =
+  document.querySelector("#sql-run");
+
+const sqlQuery =
+  document.querySelector("#sql-query");
+
+const sqlOutput =
+  document.querySelector("#sql-output");
+
+const sqlStatus =
+  document.querySelector("#sql-status");
+
+  /*
+ * ==========================================
+ * SQL PANEL
+ * ==========================================
+ */
+
+function openSqlPanel() {
+
+  sqlPanel.classList.add("open");
+
+  sqlOverlay.classList.add("open");
+
+}
+
+
+function closeSqlPanel() {
+
+  sqlPanel.classList.remove("open");
+
+  sqlOverlay.classList.remove("open");
+
+}
+
+
+sqlToggle.addEventListener(
+  "click",
+  openSqlPanel
+);
+
+
+sqlClose.addEventListener(
+  "click",
+  closeSqlPanel
+);
+
+
+sqlOverlay.addEventListener(
+  "click",
+  closeSqlPanel
+);
+
+
+/*
+ * ==========================================
+ * RUN SQL
+ * ==========================================
+ */
+
+sqlRun.addEventListener(
+  "click",
+  async () => {
+
+    const query =
+      sqlQuery.value.trim();
+
+
+    if (!query) {
+
+      sqlStatus.textContent =
+        "Enter a SQL query.";
+
+      return;
+
+    }
+
+
+    sqlStatus.textContent =
+      "Running query...";
+
+    sqlOutput.textContent =
+      "";
+
+
+    sqlRun.disabled =
+      true;
+
+
+    try {
+
+      const { data, error } =
+        await supabase.rpc(
+          "run_sql",
+          {
+            query_text: query
+          }
+        );
+
+
+      if (error) {
+
+        throw error;
+
+      }
+
+
+      sqlStatus.textContent =
+        "Query completed";
+
+
+      sqlOutput.textContent =
+        JSON.stringify(
+          data,
+          null,
+          2
+        );
+
+
+    } catch (error) {
+
+      console.error(
+        "SQL error:",
+        error
+      );
+
+
+      sqlStatus.textContent =
+        "Query failed";
+
+
+      sqlOutput.textContent =
+        JSON.stringify(
+          {
+            error:
+              error.message ||
+              String(error)
+          },
+          null,
+          2
+        );
+
+    } finally {
+
+      sqlRun.disabled =
+        false;
+
+    }
+
+  }
+);
 
     /*
      * ==========================================
@@ -1745,5 +2007,516 @@ const categories = [
     }
 
   }
+  /*
+ * ==========================================
+ * SQL TOGGLE
+ * ==========================================
+ */
+
+.sql-toggle {
+
+  position: fixed;
+
+  right: 0;
+  top: 50%;
+
+  transform:
+    translateY(-50%);
+
+  z-index: 1000;
+
+  padding:
+    14px 10px;
+
+  border: 1px solid #d1d5db;
+  border-right: 0;
+
+  border-radius:
+    8px 0 0 8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #0071bc;
+
+  font-size:
+    12px;
+
+  font-weight:
+    800;
+
+  cursor:
+    pointer;
+
+  writing-mode:
+    vertical-rl;
+
+  box-shadow:
+    0 4px 16px
+    rgba(0, 0, 0, .08);
+
+}
+
+
+.sql-toggle:hover {
+
+  background:
+    #f8fafc;
+
+}
+
+
+/*
+ * ==========================================
+ * SQL OVERLAY
+ * ==========================================
+ */
+
+.sql-overlay {
+
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 1100;
+
+  background:
+    rgba(15, 23, 42, .18);
+
+  opacity: 0;
+
+  visibility: hidden;
+
+  transition:
+    opacity .25s ease,
+    visibility .25s ease;
+
+}
+
+
+.sql-overlay.open {
+
+  opacity: 1;
+
+  visibility: visible;
+
+}
+
+
+/*
+ * ==========================================
+ * SQL PANEL
+ * ==========================================
+ */
+
+.sql-panel {
+
+  position: fixed;
+
+  top: 0;
+  right: 0;
+
+  width:
+    min(520px, 92vw);
+
+  height: 100vh;
+
+  z-index: 1200;
+
+  background:
+    #ffffff;
+
+  border-left:
+    1px solid #e5e7eb;
+
+  box-shadow:
+    -10px 0 40px
+    rgba(15, 23, 42, .15);
+
+  transform:
+    translateX(100%);
+
+  transition:
+    transform .28s ease;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+}
+
+
+.sql-panel.open {
+
+  transform:
+    translateX(0);
+
+}
+
+
+/*
+ * ==========================================
+ * PANEL HEADER
+ * ==========================================
+ */
+
+.sql-panel-header {
+
+  display:
+    flex;
+
+  align-items:
+    flex-start;
+
+  justify-content:
+    space-between;
+
+  padding:
+    24px;
+
+  border-bottom:
+    1px solid #e5e7eb;
+
+}
+
+
+.sql-label {
+
+  display:
+    block;
+
+  margin-bottom:
+    6px;
+
+  color:
+    #64748b;
+
+  font-size:
+    10px;
+
+  font-weight:
+    800;
+
+  letter-spacing:
+    .14em;
+
+}
+
+
+.sql-panel-header h2 {
+
+  margin:
+    0;
+
+  font-size:
+    22px;
+
+  color:
+    #111827;
+
+}
+
+
+.sql-close {
+
+  width:
+    34px;
+
+  height:
+    34px;
+
+  border:
+    1px solid #d1d5db;
+
+  border-radius:
+    7px;
+
+  background:
+    #ffffff;
+
+  color:
+    #475569;
+
+  font-size:
+    22px;
+
+  line-height:
+    1;
+
+  cursor:
+    pointer;
+
+}
+
+
+.sql-close:hover {
+
+  background:
+    #f8fafc;
+
+}
+
+
+/*
+ * ==========================================
+ * PANEL BODY
+ * ==========================================
+ */
+
+.sql-panel-body {
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    14px;
+
+  padding:
+    22px;
+
+  overflow:
+    auto;
+
+  flex: 1;
+
+}
+
+
+.sql-help {
+
+  margin:
+    0;
+
+  color:
+    #64748b;
+
+  font-size:
+    13px;
+
+  line-height:
+    1.5;
+
+}
+
+
+/*
+ * ==========================================
+ * SQL EDITOR
+ * ==========================================
+ */
+
+.sql-query {
+
+  width:
+    100%;
+
+  min-height:
+    180px;
+
+  resize:
+    vertical;
+
+  padding:
+    14px;
+
+  border:
+    1px solid #cbd5e1;
+
+  border-radius:
+    8px;
+
+  background:
+    #f8fafc;
+
+  color:
+    #111827;
+
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+
+  font-size:
+    13px;
+
+  line-height:
+    1.5;
+
+  outline:
+    none;
+
+}
+
+
+.sql-query:focus {
+
+  border-color:
+    #0071bc;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(
+      0,
+      113,
+      188,
+      .10
+    );
+
+}
+
+
+/*
+ * ==========================================
+ * RUN BUTTON
+ * ==========================================
+ */
+
+.sql-run {
+
+  width:
+    100%;
+
+  padding:
+    11px 16px;
+
+  border:
+    0;
+
+  border-radius:
+    7px;
+
+  background:
+    #0071bc;
+
+  color:
+    #ffffff;
+
+  font-size:
+    13px;
+
+  font-weight:
+    700;
+
+  cursor:
+    pointer;
+
+}
+
+
+.sql-run:hover {
+
+  background:
+    #005a96;
+
+}
+
+
+.sql-run:disabled {
+
+  opacity:
+    .6;
+
+  cursor:
+    wait;
+
+}
+
+
+/*
+ * ==========================================
+ * STATUS
+ * ==========================================
+ */
+
+.sql-status {
+
+  min-height:
+    18px;
+
+  color:
+    #64748b;
+
+  font-size:
+    12px;
+
+}
+
+
+/*
+ * ==========================================
+ * JSON OUTPUT
+ * ==========================================
+ */
+
+.sql-output {
+
+  min-height:
+    250px;
+
+  margin:
+    0;
+
+  padding:
+    16px;
+
+  overflow:
+    auto;
+
+  border:
+    1px solid #e2e8f0;
+
+  border-radius:
+    8px;
+
+  background:
+    #0f172a;
+
+  color:
+    #e2e8f0;
+
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+
+  font-size:
+    12px;
+
+  line-height:
+    1.55;
+
+  white-space:
+    pre-wrap;
+
+  word-break:
+    break-word;
+
+}
+
+
+/*
+ * ==========================================
+ * MOBILE
+ * ==========================================
+ */
+
+@media (max-width: 600px) {
+
+  .sql-panel {
+
+    width:
+      100%;
+
+  }
+
+}
 
 </style>
