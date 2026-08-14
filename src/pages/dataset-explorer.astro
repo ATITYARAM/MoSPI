@@ -458,14 +458,6 @@ sqlRun.addEventListener(
      * Move API access to a backend later.
      */
 
-    const API_KEY =
-      "d67ef738b51747334c26ca8aebff8b6d";
-
-
-    const API_BASE =
-      "https://microdata.gov.in/NADA/index.php";
-
-
     /*
      * ==========================================
      * ELEMENTS
@@ -637,17 +629,7 @@ sqlRun.addEventListener(
       try {
 
         const response =
-          await fetch(
-            `${API_BASE}/api/listdatasets`,
-            {
-              method: "GET",
-
-              headers: {
-                "X-API-KEY": API_KEY,
-                "Accept": "application/json"
-              }
-            }
-          );
+          await fetch("/api/mospi");
 
 
         if (!response.ok) {

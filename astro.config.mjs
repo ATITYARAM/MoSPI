@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  site: 'https://atityaram.github.io',
-  base: '/MoSPI',
+  site: 'https://YOUR-USERNAME.github.io/MoSPI/',
+  base: '/MoSPI/'
 });
