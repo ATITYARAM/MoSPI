@@ -50,9 +50,14 @@ const categories = [
 
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
   <title>Dataset Explorer | MoSPI</title>
 </head>
 
@@ -60,68 +65,162 @@ const categories = [
 
   <main class="explorer">
 
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">MoSPI MICRODATA</p>
-        <h1>Dataset Explorer</h1>
-        <p class="subtitle">
-          Browse datasets by survey category
-        </p>
-      </div>
+    <!-- =========================
+         SURVEY SELECTION PAGE
+    ========================== -->
 
-      <a href="/" class="back-button">
-        ← Back
-      </a>
-    </header>
+    <section id="survey-page">
 
-    <section class="category-grid">
+      <header class="page-header">
 
-      {categories.map((category) => (
-        <button
-          class="category-card"
-          data-category={category.key}
-        >
-          <span class="category-code">{category.short}</span>
+        <div>
+          <p class="eyebrow">MoSPI MICRODATA</p>
 
-          <span class="category-name">
-            {category.name}
-          </span>
+          <h1>Dataset Explorer</h1>
 
-          <span class="category-arrow">→</span>
-        </button>
-      ))}
+          <p class="subtitle">
+            Browse datasets by survey category
+          </p>
+        </div>
+
+        <a href="/" class="back-button">
+          ← Back
+        </a>
+
+      </header>
+
+      <section class="category-grid">
+
+        {
+          categories.map((category) => (
+            <button
+              class="category-card"
+              data-category={category.key}
+            >
+
+              <span class="category-code">
+                {category.short}
+              </span>
+
+              <span class="category-name">
+                {category.name}
+              </span>
+
+              <span class="category-arrow">
+                →
+              </span>
+
+            </button>
+          ))
+        }
+
+      </section>
 
     </section>
 
-    <section id="results" class="results-section">
 
-      <div class="results-header">
-        <div>
-          <p class="eyebrow">DATASETS</p>
-          <h2 id="results-title">Select a survey</h2>
+    <!-- =========================
+         DATASET PAGE
+    ========================== -->
+
+    <section id="dataset-page" class="hidden">
+
+      <header class="dataset-header">
+
+        <button
+          id="back-surveys"
+          class="back-surveys"
+        >
+          ← All Surveys
+        </button>
+
+        <div class="dataset-heading">
+
+          <p class="eyebrow">
+            MoSPI MICRODATA
+          </p>
+
+          <h1 id="selected-category">
+            Dataset
+          </h1>
+
+          <p class="subtitle">
+            Available datasets in this survey
+          </p>
+
         </div>
 
-        <span id="dataset-count" class="count"></span>
-      </div>
+        <span
+          id="dataset-count"
+          class="count"
+        ></span>
 
-      <div id="loading" class="loading hidden">
+      </header>
+
+
+      <div
+        id="loading"
+        class="loading"
+      >
         Loading datasets...
       </div>
 
-      <div id="error" class="error hidden"></div>
 
-      <div id="dataset-list" class="dataset-list"></div>
+      <div
+        id="error"
+        class="error hidden"
+      ></div>
+
+
+      <section
+        id="dataset-list"
+        class="dataset-list"
+      ></section>
 
     </section>
 
   </main>
 
+
   <script>
+
+    /*
+     * ==========================================
+     * TEST CONFIGURATION
+     * ==========================================
+     *
+     * This API key is intentionally kept here
+     * only because this is your current testing
+     * implementation.
+     *
+     * Move API access to a backend later.
+     */
+
+    const API_KEY =
+      "d67ef738b51747334c26ca8aebff8b6d";
+
+
+    const API_BASE =
+      "https://microdata.gov.in/NADA/index.php";
+
+
+    /*
+     * ==========================================
+     * ELEMENTS
+     * ==========================================
+     */
+
+    const surveyPage =
+      document.querySelector("#survey-page");
+
+    const datasetPage =
+      document.querySelector("#dataset-page");
+
     const cards =
       document.querySelectorAll(".category-card");
 
-    const resultsTitle =
-      document.querySelector("#results-title");
+    const selectedCategory =
+      document.querySelector("#selected-category");
 
     const datasetCount =
       document.querySelector("#dataset-count");
@@ -135,128 +234,366 @@ const categories = [
     const errorBox =
       document.querySelector("#error");
 
-    /*
-     * IMPORTANT:
-     * Keep the MoSPI API key here ONLY for testing.
-     * Move it to a backend/server function later.
-     */
-    const API_KEY = "YOUR_MOSPI_API_KEY";
+    const backSurveys =
+      document.querySelector("#back-surveys");
 
-    const API_BASE =
-      "https://microdata.gov.in/NADA/index.php";
+
+    /*
+     * ==========================================
+     * CARD CLICK
+     * ==========================================
+     *
+     * Clicking a card changes the URL.
+     *
+     * Example:
+     *
+     * /dataset-explorer?category=Periodic%20Labour%20Force%20Survey
+     *
+     * The page then reloads and displays
+     * only that survey's datasets.
+     */
 
     cards.forEach((card) => {
 
-      card.addEventListener("click", async () => {
+      card.addEventListener("click", () => {
 
         const category =
           card.dataset.category;
 
-        await loadDatasets(category);
+        const url =
+          new URL(window.location.href);
+
+        url.searchParams.set(
+          "category",
+          category
+        );
+
+        window.location.href =
+          url.toString();
 
       });
 
     });
 
+
+    /*
+     * ==========================================
+     * BACK TO SURVEYS
+     * ==========================================
+     */
+
+    backSurveys.addEventListener(
+      "click",
+      () => {
+
+        const url =
+          new URL(window.location.href);
+
+        url.searchParams.delete(
+          "category"
+        );
+
+        window.location.href =
+          url.pathname;
+
+      }
+    );
+
+
+    /*
+     * ==========================================
+     * INITIAL PAGE LOAD
+     * ==========================================
+     */
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const category =
+      params.get("category");
+
+
+    if (category) {
+
+      /*
+       * Dataset mode
+       */
+
+      surveyPage.classList.add(
+        "hidden"
+      );
+
+      datasetPage.classList.remove(
+        "hidden"
+      );
+
+      selectedCategory.textContent =
+        category;
+
+      loadDatasets(category);
+
+    } else {
+
+      /*
+       * Survey selection mode
+       */
+
+      surveyPage.classList.remove(
+        "hidden"
+      );
+
+      datasetPage.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    /*
+     * ==========================================
+     * LOAD DATASETS
+     * ==========================================
+     */
+
     async function loadDatasets(category) {
 
-      resultsTitle.textContent = category;
-      datasetCount.textContent = "";
+      loading.classList.remove(
+        "hidden"
+      );
+
+      errorBox.classList.add(
+        "hidden"
+      );
+
       datasetList.innerHTML = "";
-      errorBox.classList.add("hidden");
-      loading.classList.remove("hidden");
+
+      datasetCount.textContent = "";
+
 
       try {
 
-        /*
-         * First get the complete dataset catalogue.
-         *
-         * The exact response shape can vary with the
-         * NADA installation, so we normalize it below.
-         */
+        const response =
+          await fetch(
+            `${API_BASE}/api/listdatasets`,
+            {
+              method: "GET",
 
-        const response = await fetch(
-          `${API_BASE}/api/listdatasets`,
-          {
-            headers: {
-              "X-API-KEY": API_KEY,
-              "Accept": "application/json"
+              headers: {
+                "X-API-KEY": API_KEY,
+                "Accept": "application/json"
+              }
             }
-          }
-        );
+          );
+
 
         if (!response.ok) {
+
           throw new Error(
-            `API request failed: ${response.status}`
+            `MoSPI API request failed: ${response.status}`
           );
+
         }
 
-        const data = await response.json();
 
-        console.log("MoSPI API response:", data);
+        /*
+         * Try JSON first.
+         */
+
+        const contentType =
+          response.headers.get(
+            "content-type"
+          ) || "";
+
+
+        let data;
+
+
+        if (
+          contentType.includes(
+            "application/json"
+          )
+        ) {
+
+          data =
+            await response.json();
+
+        } else {
+
+          /*
+           * Some NADA installations can
+           * return another representation.
+           */
+
+          const text =
+            await response.text();
+
+          try {
+
+            data =
+              JSON.parse(text);
+
+          } catch {
+
+            throw new Error(
+              "MoSPI API returned a non-JSON response."
+            );
+
+          }
+
+        }
+
+
+        console.log(
+          "MoSPI API response:",
+          data
+        );
+
 
         const datasets =
           normalizeDatasets(data);
 
+
+        console.log(
+          "All datasets:",
+          datasets
+        );
+
+
+        /*
+         * Filter by collection/category.
+         */
+
         const filtered =
-          datasets.filter((dataset) =>
-            matchesCategory(dataset, category)
+          datasets.filter(
+            (dataset) =>
+              matchesCategory(
+                dataset,
+                category
+              )
           );
 
-        renderDatasets(filtered);
+
+        console.log(
+          "Filtered datasets:",
+          filtered
+        );
+
+
+        renderDatasets(
+          filtered
+        );
+
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          "Dataset API error:",
+          error
+        );
+
 
         errorBox.textContent =
           error.message ||
           "Unable to load datasets.";
 
-        errorBox.classList.remove("hidden");
+
+        errorBox.classList.remove(
+          "hidden"
+        );
 
       } finally {
 
-        loading.classList.add("hidden");
+        loading.classList.add(
+          "hidden"
+        );
 
       }
 
     }
 
+
+    /*
+     * ==========================================
+     * NORMALIZE API RESPONSE
+     * ==========================================
+     */
+
     function normalizeDatasets(data) {
 
-      /*
-       * Handle common API response structures.
-       */
-
       if (Array.isArray(data)) {
+
         return data;
+
       }
 
-      if (Array.isArray(data?.data)) {
+
+      if (
+        Array.isArray(
+          data?.data
+        )
+      ) {
+
         return data.data;
+
       }
 
-      if (Array.isArray(data?.result)) {
+
+      if (
+        Array.isArray(
+          data?.result
+        )
+      ) {
+
         return data.result;
+
       }
 
-      if (Array.isArray(data?.datasets)) {
+
+      if (
+        Array.isArray(
+          data?.datasets
+        )
+      ) {
+
         return data.datasets;
+
       }
 
-      if (Array.isArray(data?.message)) {
+
+      if (
+        Array.isArray(
+          data?.message
+        )
+      ) {
+
         return data.message;
+
       }
+
 
       return [];
 
     }
 
-    function matchesCategory(dataset, category) {
 
-      const text = JSON.stringify(dataset)
-        .toLowerCase();
+    /*
+     * ==========================================
+     * CATEGORY MATCHING
+     * ==========================================
+     */
+
+    function matchesCategory(
+      dataset,
+      category
+    ) {
+
+      const text =
+        JSON.stringify(
+          dataset
+        ).toLowerCase();
+
 
       return text.includes(
         category.toLowerCase()
@@ -264,105 +601,219 @@ const categories = [
 
     }
 
-    function renderDatasets(datasets) {
+
+    /*
+     * ==========================================
+     * RENDER DATASETS
+     * ==========================================
+     */
+
+    function renderDatasets(
+      datasets
+    ) {
 
       datasetList.innerHTML = "";
+
 
       datasetCount.textContent =
         `${datasets.length} datasets`;
 
+
       if (!datasets.length) {
 
         datasetList.innerHTML = `
+
           <div class="empty">
-            <strong>No datasets found</strong>
-            <span>
-              No datasets were returned for this category.
-            </span>
-          </div>
-        `;
 
-        return;
-      }
-
-      datasets.forEach((dataset) => {
-
-        const title =
-          dataset.title ||
-          dataset.name ||
-          dataset.dataset_title ||
-          "Untitled Dataset";
-
-        const id =
-          dataset.id ||
-          dataset.dataset_id ||
-          dataset.DataSetID ||
-          dataset.reference_id ||
-          "—";
-
-        const year =
-          dataset.year ||
-          dataset.period ||
-          dataset.survey_year ||
-          "";
-
-        const card =
-          document.createElement("article");
-
-        card.className = "dataset-card";
-
-        card.innerHTML = `
-          <div class="dataset-main">
-
-            <div class="dataset-icon">
+            <div class="empty-icon">
               DB
             </div>
 
-            <div>
+            <strong>
+              No datasets found
+            </strong>
 
-              <h3>${escapeHtml(title)}</h3>
-
-              <p class="dataset-id">
-                ${escapeHtml(String(id))}
-              </p>
-
-              ${
-                year
-                  ? `<span class="dataset-year">
-                      ${escapeHtml(String(year))}
-                    </span>`
-                  : ""
-              }
-
-            </div>
+            <span>
+              No datasets were returned for
+              this survey category.
+            </span>
 
           </div>
 
-          <button class="view-button">
-            View →
-          </button>
         `;
 
-        datasetList.appendChild(card);
+        return;
 
-      });
+      }
+
+
+      datasets.forEach(
+        (dataset) => {
+
+          /*
+           * Support different possible
+           * field names from the API.
+           */
+
+          const title =
+            dataset.title ||
+            dataset.name ||
+            dataset.dataset_title ||
+            dataset.Title ||
+            dataset.DatasetTitle ||
+            "Untitled Dataset";
+
+
+          const id =
+            dataset.id ||
+            dataset.dataset_id ||
+            dataset.DataSetID ||
+            dataset.datasetId ||
+            dataset.reference_id ||
+            dataset.ReferenceID ||
+            "—";
+
+
+          const year =
+            dataset.year ||
+            dataset.period ||
+            dataset.survey_year ||
+            dataset.Year ||
+            "";
+
+
+          const collection =
+            dataset.collection ||
+            dataset.Collection ||
+            dataset.collection_name ||
+            "";
+
+
+          const card =
+            document.createElement(
+              "article"
+            );
+
+
+          card.className =
+            "dataset-card";
+
+
+          card.innerHTML = `
+
+            <div class="dataset-main">
+
+              <div class="dataset-icon">
+                DB
+              </div>
+
+
+              <div class="dataset-info">
+
+                <h2>
+                  ${escapeHtml(
+                    String(title)
+                  )}
+                </h2>
+
+
+                <p class="dataset-id">
+                  ${escapeHtml(
+                    String(id)
+                  )}
+                </p>
+
+
+                ${
+                  collection
+                    ? `
+                      <span class="dataset-collection">
+                        ${escapeHtml(
+                          String(collection)
+                        )}
+                      </span>
+                    `
+                    : ""
+                }
+
+
+                ${
+                  year
+                    ? `
+                      <span class="dataset-year">
+                        ${escapeHtml(
+                          String(year)
+                        )}
+                      </span>
+                    `
+                    : ""
+                }
+
+              </div>
+
+            </div>
+
+
+            <button
+              class="view-button"
+              type="button"
+            >
+              View →
+            </button>
+
+          `;
+
+
+          datasetList.appendChild(
+            card
+          );
+
+        }
+      );
 
     }
 
-    function escapeHtml(value) {
+
+    /*
+     * ==========================================
+     * HTML ESCAPE
+     * ==========================================
+     */
+
+    function escapeHtml(
+      value
+    ) {
 
       return value
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replaceAll(
+          "&",
+          "&amp;"
+        )
+        .replaceAll(
+          "<",
+          "&lt;"
+        )
+        .replaceAll(
+          ">",
+          "&gt;"
+        )
+        .replaceAll(
+          '"',
+          "&quot;"
+        )
+        .replaceAll(
+          "'",
+          "&#039;"
+        );
 
     }
+
   </script>
 
 </body>
+
 </html>
+
 
 <style>
 
@@ -370,8 +821,20 @@ const categories = [
     box-sizing: border-box;
   }
 
-  :global(body) {
+
+  :global(html) {
     margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
+
+  :global(body) {
+
+    margin: 0;
+
+    padding: 0;
+
     font-family:
       Inter,
       ui-sans-serif,
@@ -381,250 +844,904 @@ const categories = [
       "Segoe UI",
       sans-serif;
 
-    background: #f8fafc;
-    color: #0f172a;
+    background: #ffffff;
+
+    color: #111827;
+
   }
+
+
+  /*
+   * ==========================================
+   * MAIN CONTAINER
+   * ==========================================
+   */
 
   .explorer {
-    width: min(1180px, calc(100% - 48px));
-    margin: 0 auto;
-    padding: 54px 0 80px;
+
+    width:
+      min(
+        1100px,
+        calc(100% - 48px)
+      );
+
+    margin:
+      0 auto;
+
+    padding:
+      48px 0 80px;
+
   }
+
+
+  /*
+   * ==========================================
+   * HEADER
+   * ==========================================
+   */
 
   .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 42px;
+
+    display:
+      flex;
+
+    justify-content:
+      space-between;
+
+    align-items:
+      flex-start;
+
+    margin-bottom:
+      28px;
+
   }
+
 
   .eyebrow {
-    margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .14em;
-    color: #64748b;
+
+    margin:
+      0 0 8px;
+
+    font-size:
+      11px;
+
+    font-weight:
+      800;
+
+    letter-spacing:
+      .14em;
+
+    color:
+      #64748b;
+
   }
+
 
   h1 {
-    margin: 0;
-    font-size: clamp(34px, 5vw, 52px);
-    line-height: 1;
-    letter-spacing: -.04em;
+
+    margin:
+      0;
+
+    font-size:
+      38px;
+
+    line-height:
+      1.08;
+
+    letter-spacing:
+      -.035em;
+
+    color:
+      #111827;
+
   }
+
 
   .subtitle {
-    margin-top: 14px;
-    color: #64748b;
-    font-size: 16px;
+
+    margin:
+      10px 0 0;
+
+    color:
+      #64748b;
+
+    font-size:
+      15px;
+
   }
+
 
   .back-button {
-    padding: 11px 17px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    color: #0f172a;
-    text-decoration: none;
-    background: white;
+
+    display:
+      inline-flex;
+
+    align-items:
+      center;
+
+    padding:
+      10px 16px;
+
+    border:
+      1px solid #d1d5db;
+
+    border-radius:
+      8px;
+
+    color:
+      #111827;
+
+    text-decoration:
+      none;
+
+    background:
+      #ffffff;
+
+    font-size:
+      14px;
+
+    font-weight:
+      600;
+
   }
+
+
+  .back-button:hover {
+
+    background:
+      #f8fafc;
+
+  }
+
+
+  /*
+   * ==========================================
+   * 9 SURVEY CARDS
+   * ==========================================
+   */
 
   .category-grid {
-    display: grid;
+
+    display:
+      grid;
+
     grid-template-columns:
-      repeat(3, minmax(0, 1fr));
-    gap: 18px;
+      repeat(
+        3,
+        1fr
+      );
+
+    gap:
+      18px;
+
   }
+
 
   .category-card {
-    position: relative;
-    min-height: 170px;
-    padding: 28px;
-    text-align: left;
-    border: 1px solid #dbe2ea;
-    border-radius: 18px;
-    background: white;
-    cursor: pointer;
+
+    position:
+      relative;
+
+    height:
+      125px;
+
+    padding:
+      22px;
+
+    border:
+      1px solid #262626;
+
+    border-radius:
+      8px;
+
+    background:
+      #ffffff;
+
+    cursor:
+      pointer;
+
+    text-align:
+      center;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    justify-content:
+      center;
+
     transition:
-      transform .18s ease,
-      box-shadow .18s ease,
-      border-color .18s ease;
+      transform .15s ease,
+      box-shadow .15s ease,
+      border-color .15s ease;
+
   }
+
 
   .category-card:hover {
-    transform: translateY(-4px);
-    border-color: #94a3b8;
+
+    transform:
+      translateY(-2px);
+
+    border-color:
+      #0071bc;
+
     box-shadow:
-      0 14px 35px rgba(15, 23, 42, .09);
+      0 8px 20px
+      rgba(
+        0,
+        0,
+        0,
+        .08
+      );
+
   }
+
 
   .category-code {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
 
-    width: 44px;
-    height: 44px;
+    display:
+      none;
 
-    border-radius: 12px;
-
-    background: #eff6ff;
-    color: #0369a1;
-
-    font-size: 11px;
-    font-weight: 800;
   }
+
 
   .category-name {
-    display: block;
-    max-width: 260px;
-    margin-top: 22px;
 
-    font-size: 20px;
-    line-height: 1.25;
-    font-weight: 750;
+    max-width:
+      270px;
+
+    font-size:
+      21px;
+
+    line-height:
+      1.25;
+
+    font-weight:
+      750;
+
+    color:
+      #0071bc;
+
   }
+
 
   .category-arrow {
-    position: absolute;
-    right: 24px;
-    bottom: 24px;
 
-    font-size: 22px;
-    color: #94a3b8;
+    display:
+      none;
+
   }
 
-  .results-section {
-    margin-top: 60px;
-    padding-top: 34px;
-    border-top: 1px solid #e2e8f0;
+
+  /*
+   * ==========================================
+   * DATASET PAGE
+   * ==========================================
+   */
+
+  .dataset-header {
+
+    position:
+      relative;
+
+    padding-bottom:
+      28px;
+
+    border-bottom:
+      1px solid #e5e7eb;
+
+    margin-bottom:
+      26px;
+
   }
 
-  .results-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 22px;
+
+  .dataset-heading {
+
+    text-align:
+      center;
+
+    padding-top:
+      14px;
+
   }
 
-  .results-header h2 {
-    margin: 0;
-    font-size: 28px;
-    letter-spacing: -.025em;
+
+  .dataset-heading h1 {
+
+    font-size:
+      34px;
+
+    color:
+      #0071bc;
+
   }
+
+
+  .dataset-heading .subtitle {
+
+    font-size:
+      14px;
+
+  }
+
+
+  .back-surveys {
+
+    position:
+      absolute;
+
+    left:
+      0;
+
+    top:
+      0;
+
+    border:
+      1px solid #d1d5db;
+
+    border-radius:
+      8px;
+
+    background:
+      #ffffff;
+
+    padding:
+      9px 14px;
+
+    font-size:
+      13px;
+
+    font-weight:
+      650;
+
+    cursor:
+      pointer;
+
+    color:
+      #111827;
+
+  }
+
+
+  .back-surveys:hover {
+
+    background:
+      #f8fafc;
+
+  }
+
 
   .count {
-    color: #64748b;
-    font-size: 14px;
+
+    display:
+      block;
+
+    text-align:
+      center;
+
+    margin-top:
+      12px;
+
+    color:
+      #64748b;
+
+    font-size:
+      13px;
+
   }
+
+
+  /*
+   * ==========================================
+   * DATASET LIST
+   * ==========================================
+   */
 
   .dataset-list {
-    display: grid;
-    gap: 12px;
+
+    display:
+      grid;
+
+    grid-template-columns:
+      1fr;
+
+    gap:
+      12px;
+
   }
+
 
   .dataset-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 
-    padding: 20px 22px;
+    display:
+      flex;
 
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
+    justify-content:
+      space-between;
 
-    background: white;
+    align-items:
+      center;
+
+    min-height:
+      92px;
+
+    padding:
+      18px 20px;
+
+    border:
+      1px solid #dfe3e8;
+
+    border-radius:
+      8px;
+
+    background:
+      #ffffff;
+
+    transition:
+      box-shadow .15s ease,
+      border-color .15s ease;
+
   }
+
+
+  .dataset-card:hover {
+
+    border-color:
+      #b8c2cc;
+
+    box-shadow:
+      0 5px 18px
+      rgba(
+        0,
+        0,
+        0,
+        .06
+      );
+
+  }
+
 
   .dataset-main {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+
+    display:
+      flex;
+
+    align-items:
+      center;
+
+    gap:
+      15px;
+
+    min-width:
+      0;
+
   }
+
 
   .dataset-icon {
-    display: grid;
-    place-items: center;
 
-    width: 42px;
-    height: 42px;
+    flex:
+      0 0 auto;
 
-    border-radius: 10px;
+    width:
+      42px;
 
-    background: #f1f5f9;
-    color: #475569;
+    height:
+      42px;
 
-    font-size: 11px;
-    font-weight: 800;
+    display:
+      grid;
+
+    place-items:
+      center;
+
+    border-radius:
+      8px;
+
+    background:
+      #eef6fc;
+
+    color:
+      #0071bc;
+
+    font-size:
+      11px;
+
+    font-weight:
+      800;
+
   }
 
-  .dataset-card h3 {
-    margin: 0;
-    font-size: 16px;
+
+  .dataset-info {
+
+    min-width:
+      0;
+
   }
+
+
+  .dataset-info h2 {
+
+    margin:
+      0;
+
+    font-size:
+      16px;
+
+    line-height:
+      1.35;
+
+    font-weight:
+      700;
+
+    color:
+      #111827;
+
+  }
+
 
   .dataset-id {
-    margin: 5px 0 0;
-    font-size: 12px;
-    color: #64748b;
+
+    margin:
+      5px 0 0;
+
+    color:
+      #64748b;
+
+    font-size:
+      12px;
+
+    word-break:
+      break-word;
+
   }
+
+
+  .dataset-collection {
+
+    display:
+      inline-block;
+
+    margin-top:
+      6px;
+
+    margin-right:
+      8px;
+
+    padding:
+      3px 7px;
+
+    border-radius:
+      4px;
+
+    background:
+      #f1f5f9;
+
+    color:
+      #475569;
+
+    font-size:
+      10px;
+
+    font-weight:
+      700;
+
+  }
+
 
   .dataset-year {
-    display: inline-block;
-    margin-top: 6px;
-    font-size: 11px;
-    color: #0369a1;
+
+    display:
+      inline-block;
+
+    margin-top:
+      6px;
+
+    color:
+      #0071bc;
+
+    font-size:
+      11px;
+
   }
+
 
   .view-button {
-    padding: 9px 14px;
-    border: 0;
-    border-radius: 9px;
 
-    background: #0284c7;
-    color: white;
+    flex:
+      0 0 auto;
 
-    font-weight: 700;
-    cursor: pointer;
+    margin-left:
+      20px;
+
+    padding:
+      9px 14px;
+
+    border:
+      0;
+
+    border-radius:
+      7px;
+
+    background:
+      #0071bc;
+
+    color:
+      #ffffff;
+
+    font-size:
+      13px;
+
+    font-weight:
+      700;
+
+    cursor:
+      pointer;
+
   }
 
-  .loading,
-  .error,
-  .empty {
-    padding: 30px;
-    border-radius: 14px;
-    background: white;
-    border: 1px solid #e2e8f0;
+
+  .view-button:hover {
+
+    background:
+      #005a96;
+
   }
 
-  .empty {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+
+  /*
+   * ==========================================
+   * LOADING
+   * ==========================================
+   */
+
+  .loading {
+
+    padding:
+      40px;
+
+    text-align:
+      center;
+
+    color:
+      #64748b;
+
+    font-size:
+      14px;
+
+    border:
+      1px solid #e5e7eb;
+
+    border-radius:
+      8px;
+
+    background:
+      #ffffff;
+
   }
 
-  .empty span {
-    color: #64748b;
-    font-size: 14px;
-  }
+
+  /*
+   * ==========================================
+   * ERROR
+   * ==========================================
+   */
 
   .error {
-    color: #b91c1c;
-    background: #fef2f2;
-    border-color: #fecaca;
+
+    padding:
+      18px 20px;
+
+    border:
+      1px solid #fecaca;
+
+    border-radius:
+      8px;
+
+    background:
+      #fff7f7;
+
+    color:
+      #b91c1c;
+
+    font-size:
+      14px;
+
   }
 
-  .hidden {
-    display: none;
+
+  /*
+   * ==========================================
+   * EMPTY
+   * ==========================================
+   */
+
+  .empty {
+
+    display:
+      flex;
+
+    flex-direction:
+      column;
+
+    align-items:
+      center;
+
+    justify-content:
+      center;
+
+    gap:
+      8px;
+
+    min-height:
+      180px;
+
+    border:
+      1px solid #e5e7eb;
+
+    border-radius:
+      8px;
+
+    text-align:
+      center;
+
   }
+
+
+  .empty-icon {
+
+    display:
+      grid;
+
+    place-items:
+      center;
+
+    width:
+      42px;
+
+    height:
+      42px;
+
+    margin-bottom:
+      4px;
+
+    border-radius:
+      8px;
+
+    background:
+      #eef6fc;
+
+    color:
+      #0071bc;
+
+    font-size:
+      11px;
+
+    font-weight:
+      800;
+
+  }
+
+
+  .empty strong {
+
+    font-size:
+      15px;
+
+  }
+
+
+  .empty span {
+
+    color:
+      #64748b;
+
+    font-size:
+      13px;
+
+  }
+
+
+  /*
+   * ==========================================
+   * HIDDEN
+   * ==========================================
+   */
+
+  .hidden {
+
+    display:
+      none !important;
+
+  }
+
+
+  /*
+   * ==========================================
+   * RESPONSIVE
+   * ==========================================
+   */
 
   @media (max-width: 800px) {
 
-    .category-grid {
-      grid-template-columns: 1fr;
+    .explorer {
+
+      width:
+        min(
+          100% - 28px,
+          600px
+        );
+
+      padding-top:
+        30px;
+
     }
 
+
+    .category-grid {
+
+      grid-template-columns:
+        1fr;
+
+    }
+
+
+    .category-card {
+
+      height:
+        105px;
+
+    }
+
+
     .page-header {
-      gap: 20px;
+
+      flex-direction:
+        column;
+
+      gap:
+        18px;
+
+    }
+
+
+    .dataset-heading {
+
+      padding-top:
+        55px;
+
+    }
+
+
+    .dataset-heading h1 {
+
+      font-size:
+        28px;
+
+    }
+
+
+    .dataset-card {
+
+      align-items:
+        flex-start;
+
+      gap:
+        15px;
+
+    }
+
+
+    .view-button {
+
+      margin-left:
+        0;
+
     }
 
   }
