@@ -509,7 +509,7 @@ runSql.addEventListener('click', async () => {
         );
       };
 
-      reader.onerror = () => {
+      reader.onerror = () => {  
 
         showError(
           new Error('Unable to read the selected file.')

@@ -1,0 +1,632 @@
+---
+const categories = [
+  {
+    name: "Annual Survey of Industries",
+    short: "ASI",
+    key: "Annual Survey of Industries"
+  },
+  {
+    name: "Index of Industrial Production",
+    short: "IIP",
+    key: "Index of Industrial Production"
+  },
+  {
+    name: "Household Consumption Expenditure",
+    short: "HCES",
+    key: "Household Consumption Expenditure"
+  },
+  {
+    name: "Economic Census",
+    short: "EC",
+    key: "Economic Census"
+  },
+  {
+    name: "Enterprises Surveys",
+    short: "ES",
+    key: "Enterprises Surveys"
+  },
+  {
+    name: "Periodic Labour Force Survey",
+    short: "PLFS",
+    key: "Periodic Labour Force Survey"
+  },
+  {
+    name: "Employment and Unemployment",
+    short: "EUE",
+    key: "Employment and Unemployment"
+  },
+  {
+    name: "Land and Livestock Holding Surveys",
+    short: "LLHS",
+    key: "Land and Livestock Holding Surveys"
+  },
+  {
+    name: "Other Surveys",
+    short: "OTHER",
+    key: "Other Surveys"
+  }
+];
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dataset Explorer | MoSPI</title>
+</head>
+
+<body>
+
+  <main class="explorer">
+
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">MoSPI MICRODATA</p>
+        <h1>Dataset Explorer</h1>
+        <p class="subtitle">
+          Browse datasets by survey category
+        </p>
+      </div>
+
+      <a href="/" class="back-button">
+        ← Back
+      </a>
+    </header>
+
+    <section class="category-grid">
+
+      {categories.map((category) => (
+        <button
+          class="category-card"
+          data-category={category.key}
+        >
+          <span class="category-code">{category.short}</span>
+
+          <span class="category-name">
+            {category.name}
+          </span>
+
+          <span class="category-arrow">→</span>
+        </button>
+      ))}
+
+    </section>
+
+    <section id="results" class="results-section">
+
+      <div class="results-header">
+        <div>
+          <p class="eyebrow">DATASETS</p>
+          <h2 id="results-title">Select a survey</h2>
+        </div>
+
+        <span id="dataset-count" class="count"></span>
+      </div>
+
+      <div id="loading" class="loading hidden">
+        Loading datasets...
+      </div>
+
+      <div id="error" class="error hidden"></div>
+
+      <div id="dataset-list" class="dataset-list"></div>
+
+    </section>
+
+  </main>
+
+  <script>
+    const cards =
+      document.querySelectorAll(".category-card");
+
+    const resultsTitle =
+      document.querySelector("#results-title");
+
+    const datasetCount =
+      document.querySelector("#dataset-count");
+
+    const datasetList =
+      document.querySelector("#dataset-list");
+
+    const loading =
+      document.querySelector("#loading");
+
+    const errorBox =
+      document.querySelector("#error");
+
+    /*
+     * IMPORTANT:
+     * Keep the MoSPI API key here ONLY for testing.
+     * Move it to a backend/server function later.
+     */
+    const API_KEY = "YOUR_MOSPI_API_KEY";
+
+    const API_BASE =
+      "https://microdata.gov.in/NADA/index.php";
+
+    cards.forEach((card) => {
+
+      card.addEventListener("click", async () => {
+
+        const category =
+          card.dataset.category;
+
+        await loadDatasets(category);
+
+      });
+
+    });
+
+    async function loadDatasets(category) {
+
+      resultsTitle.textContent = category;
+      datasetCount.textContent = "";
+      datasetList.innerHTML = "";
+      errorBox.classList.add("hidden");
+      loading.classList.remove("hidden");
+
+      try {
+
+        /*
+         * First get the complete dataset catalogue.
+         *
+         * The exact response shape can vary with the
+         * NADA installation, so we normalize it below.
+         */
+
+        const response = await fetch(
+          `${API_BASE}/api/listdatasets`,
+          {
+            headers: {
+              "X-API-KEY": API_KEY,
+              "Accept": "application/json"
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `API request failed: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        console.log("MoSPI API response:", data);
+
+        const datasets =
+          normalizeDatasets(data);
+
+        const filtered =
+          datasets.filter((dataset) =>
+            matchesCategory(dataset, category)
+          );
+
+        renderDatasets(filtered);
+
+      } catch (error) {
+
+        console.error(error);
+
+        errorBox.textContent =
+          error.message ||
+          "Unable to load datasets.";
+
+        errorBox.classList.remove("hidden");
+
+      } finally {
+
+        loading.classList.add("hidden");
+
+      }
+
+    }
+
+    function normalizeDatasets(data) {
+
+      /*
+       * Handle common API response structures.
+       */
+
+      if (Array.isArray(data)) {
+        return data;
+      }
+
+      if (Array.isArray(data?.data)) {
+        return data.data;
+      }
+
+      if (Array.isArray(data?.result)) {
+        return data.result;
+      }
+
+      if (Array.isArray(data?.datasets)) {
+        return data.datasets;
+      }
+
+      if (Array.isArray(data?.message)) {
+        return data.message;
+      }
+
+      return [];
+
+    }
+
+    function matchesCategory(dataset, category) {
+
+      const text = JSON.stringify(dataset)
+        .toLowerCase();
+
+      return text.includes(
+        category.toLowerCase()
+      );
+
+    }
+
+    function renderDatasets(datasets) {
+
+      datasetList.innerHTML = "";
+
+      datasetCount.textContent =
+        `${datasets.length} datasets`;
+
+      if (!datasets.length) {
+
+        datasetList.innerHTML = `
+          <div class="empty">
+            <strong>No datasets found</strong>
+            <span>
+              No datasets were returned for this category.
+            </span>
+          </div>
+        `;
+
+        return;
+      }
+
+      datasets.forEach((dataset) => {
+
+        const title =
+          dataset.title ||
+          dataset.name ||
+          dataset.dataset_title ||
+          "Untitled Dataset";
+
+        const id =
+          dataset.id ||
+          dataset.dataset_id ||
+          dataset.DataSetID ||
+          dataset.reference_id ||
+          "—";
+
+        const year =
+          dataset.year ||
+          dataset.period ||
+          dataset.survey_year ||
+          "";
+
+        const card =
+          document.createElement("article");
+
+        card.className = "dataset-card";
+
+        card.innerHTML = `
+          <div class="dataset-main">
+
+            <div class="dataset-icon">
+              DB
+            </div>
+
+            <div>
+
+              <h3>${escapeHtml(title)}</h3>
+
+              <p class="dataset-id">
+                ${escapeHtml(String(id))}
+              </p>
+
+              ${
+                year
+                  ? `<span class="dataset-year">
+                      ${escapeHtml(String(year))}
+                    </span>`
+                  : ""
+              }
+
+            </div>
+
+          </div>
+
+          <button class="view-button">
+            View →
+          </button>
+        `;
+
+        datasetList.appendChild(card);
+
+      });
+
+    }
+
+    function escapeHtml(value) {
+
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    }
+  </script>
+
+</body>
+</html>
+
+<style>
+
+  :global(*) {
+    box-sizing: border-box;
+  }
+
+  :global(body) {
+    margin: 0;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+
+    background: #f8fafc;
+    color: #0f172a;
+  }
+
+  .explorer {
+    width: min(1180px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 54px 0 80px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 42px;
+  }
+
+  .eyebrow {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    color: #64748b;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(34px, 5vw, 52px);
+    line-height: 1;
+    letter-spacing: -.04em;
+  }
+
+  .subtitle {
+    margin-top: 14px;
+    color: #64748b;
+    font-size: 16px;
+  }
+
+  .back-button {
+    padding: 11px 17px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    color: #0f172a;
+    text-decoration: none;
+    background: white;
+  }
+
+  .category-grid {
+    display: grid;
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .category-card {
+    position: relative;
+    min-height: 170px;
+    padding: 28px;
+    text-align: left;
+    border: 1px solid #dbe2ea;
+    border-radius: 18px;
+    background: white;
+    cursor: pointer;
+    transition:
+      transform .18s ease,
+      box-shadow .18s ease,
+      border-color .18s ease;
+  }
+
+  .category-card:hover {
+    transform: translateY(-4px);
+    border-color: #94a3b8;
+    box-shadow:
+      0 14px 35px rgba(15, 23, 42, .09);
+  }
+
+  .category-code {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 44px;
+    height: 44px;
+
+    border-radius: 12px;
+
+    background: #eff6ff;
+    color: #0369a1;
+
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .category-name {
+    display: block;
+    max-width: 260px;
+    margin-top: 22px;
+
+    font-size: 20px;
+    line-height: 1.25;
+    font-weight: 750;
+  }
+
+  .category-arrow {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+
+    font-size: 22px;
+    color: #94a3b8;
+  }
+
+  .results-section {
+    margin-top: 60px;
+    padding-top: 34px;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 22px;
+  }
+
+  .results-header h2 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: -.025em;
+  }
+
+  .count {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .dataset-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .dataset-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 20px 22px;
+
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+
+    background: white;
+  }
+
+  .dataset-main {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .dataset-icon {
+    display: grid;
+    place-items: center;
+
+    width: 42px;
+    height: 42px;
+
+    border-radius: 10px;
+
+    background: #f1f5f9;
+    color: #475569;
+
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .dataset-card h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+
+  .dataset-id {
+    margin: 5px 0 0;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .dataset-year {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #0369a1;
+  }
+
+  .view-button {
+    padding: 9px 14px;
+    border: 0;
+    border-radius: 9px;
+
+    background: #0284c7;
+    color: white;
+
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .loading,
+  .error,
+  .empty {
+    padding: 30px;
+    border-radius: 14px;
+    background: white;
+    border: 1px solid #e2e8f0;
+  }
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .empty span {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .error {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  @media (max-width: 800px) {
+
+    .category-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .page-header {
+      gap: 20px;
+    }
+
+  }
+
+</style>
